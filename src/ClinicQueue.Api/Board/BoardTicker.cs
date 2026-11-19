@@ -12,8 +12,7 @@ public sealed class BoardTicker(
     IServiceScopeFactory scopes,
     IBoardNotifier notifier,
     TimeProvider clock,
-    IConfiguration config,
-    ILogger<BoardTicker> logger) : BackgroundService
+    IConfiguration config) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -37,8 +36,6 @@ public sealed class BoardTicker(
             {
                 await notifier.ClinicChangedAsync(slug, stoppingToken);
             }
-
-            logger.LogDebug("Refreshed {Count} boards", slugs.Count);
         }
     }
 }
