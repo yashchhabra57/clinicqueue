@@ -58,15 +58,18 @@
         : [el("div", { class: "empty" }, "Nobody is waiting.")]));
     }
 
-    connectBoard(slug, render, (s) => ($("status").textContent = s)).catch(async () => {
-      // No WebSocket? Fall back to polling the public endpoint.
+    async function fetchBoard() {
+      const res = await fetch(`/api/clinics/${encodeURIComponent(slug)}/board`);
+      if (res.ok) render(await res.json());
+      else $("clinic-name").textContent = res.status === 404 ? "Clinic not found" : "Board unavailable";
+    }
+
+    // Paint from plain HTTP first so the screen is never blank while the socket connects,
+    // then switch to live pushes. If the hub is unreachable, fall back to polling.
+    await fetchBoard();
+    connectBoard(slug, render, (s) => ($("status").textContent = s)).catch(() => {
       $("status").textContent = "polling";
-      const poll = async () => {
-        const res = await fetch(`/api/clinics/${encodeURIComponent(slug)}/board`);
-        if (res.ok) render(await res.json());
-      };
-      await poll();
-      setInterval(poll, 15000);
+      setInterval(fetchBoard, 15000);
     });
   </script>
 </body>
