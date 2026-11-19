@@ -26,6 +26,7 @@ public sealed class ClinicApiFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection? _keepAlive;
     private readonly string _connectionString;
     private readonly string _provider;
+    private bool _dropped;
 
     public ClinicApiFactory()
     {
@@ -98,8 +99,10 @@ public sealed class ClinicApiFactory : WebApplicationFactory<Program>
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing && IsPostgres && Server is not null)
+        // The base class re-enters Dispose(true) from DisposeAsync, so drop the database only once.
+        if (disposing && IsPostgres && !_dropped)
         {
+            _dropped = true;
             using var scope = Services.CreateScope();
             scope.ServiceProvider.GetRequiredService<ClinicDb>().Database.EnsureDeleted();
         }
