@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wait Times</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+</head>
+<body class="lobby">
+  <header class="top">
+    <div>
+      <h1 id="clinic-name">Loading&hellip;</h1>
+      <div class="sub">Estimated waits update live. Your ticket number is on your check-in slip.</div>
+    </div>
+    <span class="status" id="status">connecting&hellip;</span>
+  </header>
+  <main>
+    <div class="lobby-grid">
+      <section class="panel">
+        <h2>Now serving</h2>
+        <div class="serving" id="serving"></div>
+        <h2 style="margin-top:28px">If you check in now</h2>
+        <div class="walkin" id="walkin">&mdash;</div>
+        <div class="status" id="counts"></div>
+      </section>
+      <section class="panel">
+        <h2>Waiting</h2>
+        <div id="queue"></div>
+      </section>
+    </div>
+  </main>
+  <script type="module">
+    import { clinicSlug, connectBoard, el, formatRange } from "./common.js";
+
+    const slug = clinicSlug();
+    const $ = (id) => document.getElementById(id);
+
+    function render(board) {
+      if (!board) return;
+      document.title = `${board.name} – Wait Times`;
+      $("clinic-name").textContent = board.name;
+
+      $("serving").replaceChildren(...(board.nowServing.length
+        ? board.nowServing.map((code) => el("span", { class: "ticket" }, code))
+        : [el("div", { class: "empty" }, "No one is with a provider right now.")]));
+
+      $("walkin").textContent = board.providersOnShift === 0
+        ? "Providers are not on shift yet"
+        : formatRange(board.walkInEstimate);
+      $("counts").textContent =
+        `${board.waiting} waiting · ${board.inRoom} with a provider · ${board.providersOnShift} provider(s) on shift`;
+
+      $("queue").replaceChildren(...(board.queue.length
+        ? board.queue.map((t) => el("div", { class: "queue-row" },
+            el("span", { class: "code" }, t.ticketCode),
+            el("span", { class: "eta" }, formatRange(t.estimatedWait))))
+        : [el("div", { class: "empty" }, "Nobody is waiting.")]));
+    }
+
+    connectBoard(slug, render, (s) => ($("status").textContent = s)).catch(async () => {
+      // No WebSocket? Fall back to polling the public endpoint.
+      $("status").textContent = "polling";
+      const poll = async () => {
+        const res = await fetch(`/api/clinics/${encodeURIComponent(slug)}/board`);
+        if (res.ok) render(await res.json());
+      };
+      await poll();
+      setInterval(poll, 15000);
+    });
+  </script>
+</body>
+</html>

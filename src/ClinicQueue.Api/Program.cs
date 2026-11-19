@@ -19,6 +19,8 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 await app.Services.InitializeDatabaseAsync(seedDemo: app.Configuration.GetValue("Seed:Demo", true));
 

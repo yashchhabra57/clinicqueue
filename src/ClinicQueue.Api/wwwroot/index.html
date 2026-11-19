@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClinicQueue</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>ClinicQueue</h1>
+      <div class="sub">Live walk-in wait times from a queueing model, not a guess.</div>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Clinics</h2>
+      <table>
+        <thead><tr><th>Clinic</th><th>Lobby screen (public)</th><th>Front desk (staff)</th></tr></thead>
+        <tbody id="clinics"><tr><td colspan="3" class="empty">Loading&hellip;</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+  <script type="module">
+    import { el } from "./common.js";
+    const res = await fetch("/api/clinics");
+    const clinics = res.ok ? await res.json() : [];
+    document.getElementById("clinics").replaceChildren(...(clinics.length
+      ? clinics.map((c) => el("tr", {},
+          el("td", {}, c.name),
+          el("td", {}, el("a", { href: `board.html?clinic=${encodeURIComponent(c.slug)}` }, "Open lobby board")),
+          el("td", {}, el("a", { href: `desk.html?clinic=${encodeURIComponent(c.slug)}` }, "Open front desk"))))
+      : [el("tr", {}, el("td", { colspan: 3, class: "empty" }, "No clinics yet. Start with Seed:Demo=true to create one."))]));
+  </script>
+</body>
+</html>
