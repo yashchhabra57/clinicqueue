@@ -25,6 +25,7 @@ await app.Services.InitializeDatabaseAsync();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapVisitEndpoints();
 app.MapBoardEndpoints();
+app.MapForecastEndpoints();
 app.MapHub<BoardHub>(BoardHub.Path);
 
 await app.RunAsync();
