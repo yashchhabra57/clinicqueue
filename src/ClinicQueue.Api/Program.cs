@@ -13,6 +13,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IBoardNotifier, SignalRBoardNotifier>();
 builder.Services.AddSingleton(builder.Configuration.GetSection("Board").Get<BoardOptions>() ?? new BoardOptions());
 builder.Services.AddScoped<BoardService>();
+builder.Services.AddHostedService<BoardTicker>();
 
 var app = builder.Build();
 
