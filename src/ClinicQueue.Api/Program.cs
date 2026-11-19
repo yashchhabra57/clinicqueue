@@ -20,7 +20,7 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-await app.Services.InitializeDatabaseAsync();
+await app.Services.InitializeDatabaseAsync(seedDemo: app.Configuration.GetValue("Seed:Demo", true));
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapVisitEndpoints();

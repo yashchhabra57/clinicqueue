@@ -32,7 +32,7 @@ public static class DatabaseSetup
         return services;
     }
 
-    public static async Task InitializeDatabaseAsync(this IServiceProvider services, CancellationToken ct = default)
+    public static async Task InitializeDatabaseAsync(this IServiceProvider services, bool seedDemo, CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ClinicDb>();
@@ -43,6 +43,11 @@ public static class DatabaseSetup
         else
         {
             await db.Database.EnsureCreatedAsync(ct);
+        }
+
+        if (seedDemo)
+        {
+            await DemoSeeder.SeedAsync(db, scope.ServiceProvider.GetRequiredService<TimeProvider>(), ct);
         }
     }
 }
