@@ -1,0 +1,30 @@
+# Production-like stack: the API on PostgreSQL. `docker compose up --build`, then open http://localhost:8080
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: clinicqueue
+      POSTGRES_PASSWORD: clinicqueue
+      POSTGRES_DB: clinicqueue
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinicqueue"]
+      interval: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      Database__Provider: Postgres
+      ConnectionStrings__ClinicQueue: "Host=db;Database=clinicqueue;Username=clinicqueue;Password=clinicqueue"
+      Staff__ApiKey: ${STAFF_API_KEY:-change-me}
+      Seed__Demo: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
