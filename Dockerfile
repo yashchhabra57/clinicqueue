@@ -11,6 +11,8 @@ RUN dotnet publish src/ClinicQueue.Api/ClinicQueue.Api.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+# Clinic time zones (ticket numbering resets at local midnight) need the IANA database.
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app .
 ENV ASPNETCORE_URLS=http://+:8080 \
     ConnectionStrings__ClinicQueue="Data Source=/data/clinicqueue.db"

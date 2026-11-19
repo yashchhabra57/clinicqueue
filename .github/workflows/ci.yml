@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: Build, format, test (SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore
+      - name: Check formatting
+        run: dotnet format --verify-no-changes --no-restore
+      - name: Build (warnings are errors)
+        run: dotnet build -c Release --no-restore
+      - name: Test with coverage
+        run: dotnet test -c Release --no-build --collect:"XPlat Code Coverage" --results-directory coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          for f in coverage/*/coverage.cobertura.xml; do
+            rate=$(grep -o 'line-rate="[0-9.]*"' "$f" | head -1 | grep -o '[0-9.]*')
+            echo "$f line coverage: $(awk "BEGIN { printf \"%.1f%%\", $rate * 100 }")" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/**/coverage.cobertura.xml
+
+  postgres:
+    name: API tests on PostgreSQL (migrations)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 3s
+          --health-retries 20
+    env:
+      CLINICQUEUE_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Check migrations match the model
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes -p src/ClinicQueue.Api
+      - name: Run API tests against PostgreSQL
+        run: dotnet test tests/ClinicQueue.Api.Tests -c Release
+
+  docker:
+    name: Docker image smoke test
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t clinicqueue:ci .
+      - name: Run and probe
+        run: |
+          docker run -d --name cq -p 8080:8080 -e Staff__ApiKey=ci-key clinicqueue:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:8080/healthz && break; sleep 1; done
+          curl -sf http://localhost:8080/api/clinics | grep -q northside
+          curl -sf -X POST http://localhost:8080/api/clinics/northside/visits \
+            -H 'X-Staff-Key: ci-key' -H 'Content-Type: application/json' \
+            -d '{"initials":"CI","reason":"smoke"}' | grep -q 'A-001'
+          curl -sf http://localhost:8080/api/clinics/northside/board | grep -q 'A-001'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/clinics/northside/desk)" = 401
+          curl -sf http://localhost:8080/board.html | grep -q 'Now serving'
+      - name: Container logs
+        if: always()
+        run: docker logs cq || true
