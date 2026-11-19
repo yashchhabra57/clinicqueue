@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Front Desk</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1 id="clinic-name">Front desk</h1>
+      <div class="sub">Staff only. Initials and reasons never appear on the lobby screen.</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a id="lobby-link" href="board.html">Lobby screen</a>
+      <span class="status" id="status">connecting&hellip;</span>
+    </div>
+  </header>
+  <main>
+    <div class="error" id="error" role="alert"></div>
+
+    <section class="panel" id="key-panel" hidden>
+      <h2>Staff key</h2>
+      <form class="inline" id="key-form">
+        <label>Front-desk key <input type="password" id="key-input" autocomplete="off" required></label>
+        <button class="primary" type="submit">Unlock</button>
+      </form>
+      <p class="status">Local development uses <code>dev-staff-key</code>.</p>
+    </section>
+
+    <div id="desk" hidden>
+      <div class="grid">
+        <section class="panel">
+          <h2>Check in</h2>
+          <form class="inline" id="checkin-form">
+            <label>Initials <input id="initials" maxlength="3" size="4" pattern="[A-Za-z]{1,3}" required></label>
+            <label style="flex:1">Reason (optional) <input id="reason" maxlength="80" style="width:100%"></label>
+            <button class="primary" type="submit">Check in</button>
+          </form>
+          <p class="status" id="checkin-result"></p>
+        </section>
+        <section class="panel">
+          <h2>Providers on shift</h2>
+          <div class="stepper">
+            <button id="staff-minus" aria-label="One fewer provider">&minus;</button>
+            <span class="value" id="providers">&ndash;</span>
+            <button id="staff-plus" aria-label="One more provider">+</button>
+            <span id="recommendation" class="pill"></span>
+          </div>
+          <p class="status" id="walkin"></p>
+        </section>
+      </div>
+
+      <section class="panel" style="margin-top:16px">
+        <h2>Right now</h2>
+        <div class="stat-row" id="stats"></div>
+      </section>
+
+      <div class="grid" style="margin-top:16px">
+        <section class="panel">
+          <h2>Waiting <button id="call-next" class="primary" style="float:right">Call next</button></h2>
+          <table>
+            <thead><tr><th>Ticket</th><th>Pt</th><th>Reason</th><th>Waited</th><th>Estimate</th><th></th></tr></thead>
+            <tbody id="waiting"></tbody>
+          </table>
+        </section>
+        <section class="panel">
+          <h2>With a provider</h2>
+          <table>
+            <thead><tr><th>Ticket</th><th>Pt</th><th>In room</th><th></th></tr></thead>
+            <tbody id="rooms"></tbody>
+          </table>
+        </section>
+      </div>
+
+      <div class="grid" style="margin-top:16px">
+        <section class="panel">
+          <h2>What if: providers vs. patients seen on time</h2>
+          <div id="curve"></div>
+        </section>
+        <section class="panel">
+          <h2>Typical day: arrivals and recommended staffing</h2>
+          <div id="day"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="desk.js"></script>
+</body>
+</html>
