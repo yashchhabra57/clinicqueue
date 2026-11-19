@@ -9,7 +9,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddClinicDatabase(builder.Configuration);
 builder.Services.AddStaffAuth(builder.Configuration, builder.Environment);
-builder.Services.AddSingleton<IBoardNotifier, NullBoardNotifier>();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IBoardNotifier, SignalRBoardNotifier>();
 builder.Services.AddSingleton(builder.Configuration.GetSection("Board").Get<BoardOptions>() ?? new BoardOptions());
 builder.Services.AddScoped<BoardService>();
 
@@ -23,6 +24,7 @@ await app.Services.InitializeDatabaseAsync();
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapVisitEndpoints();
 app.MapBoardEndpoints();
+app.MapHub<BoardHub>(BoardHub.Path);
 
 await app.RunAsync();
 
