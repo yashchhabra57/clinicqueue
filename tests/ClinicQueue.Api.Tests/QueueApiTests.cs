@@ -70,6 +70,18 @@ public sealed class QueueApiTests : IAsyncLifetime, IDisposable
         Assert.Equal("A-001", (await CheckIn()).TicketCode);
     }
 
+    [Fact]
+    public async Task Simultaneous_check_ins_all_succeed_with_unique_tickets()
+    {
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            _staff.PostAsJsonAsync($"{Base}/visits", new CheckInRequest("PX", null))));
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+
+        var tickets = await Task.WhenAll(responses.Select(r => r.ReadAsync<VisitDto>()));
+        var codes = tickets.Select(t => t.TicketCode).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(Enumerable.Range(1, 8).Select(VisitEndpoints.FormatTicket), codes);
+    }
+
     [Theory]
     [InlineData("", null)]
     [InlineData("John Doe", null)]

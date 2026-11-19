@@ -72,7 +72,7 @@ public static partial class VisitEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        var clinic = await db.Clinics.SingleOrDefaultAsync(c => c.Slug == slug, ct);
+        var clinic = await db.Clinics.AsNoTracking().SingleOrDefaultAsync(c => c.Slug == slug, ct);
         if (clinic is null)
         {
             return ClinicNotFound(slug);
@@ -80,29 +80,34 @@ public static partial class VisitEndpoints
 
         var now = clock.GetUtcNow().UtcDateTime;
         var today = DateOnly.FromDateTime(ClinicClock.ToLocal(clinic, now));
-        if (clinic.TicketDay != today)
-        {
-            clinic.TicketDay = today;
-            clinic.LastTicketNumber = 0;
-        }
 
-        clinic.LastTicketNumber++;
-        clinic.Version = Guid.NewGuid();
+        // Ticket numbers come from a counter on the clinic row. A read-modify-write in C# would let
+        // two desks hand out the same number (or, with a concurrency token, make one of them fail
+        // and retry, which falls apart under a burst). Instead the database does the increment in a
+        // single UPDATE, which row-locks on PostgreSQL and serializes on SQLite, so simultaneous
+        // check-ins simply queue up for a few milliseconds. In SQL, every SET expression sees the
+        // old row, so the CASE resets the counter on the first check-in of a new local day.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Clinics
+            .Where(c => c.Id == clinic.Id)
+            .ExecuteUpdateAsync(
+                set => set
+                    .SetProperty(c => c.LastTicketNumber, c => c.TicketDay == today ? c.LastTicketNumber + 1 : 1)
+                    .SetProperty(c => c.TicketDay, today),
+                ct);
+        var number = await db.Clinics.Where(c => c.Id == clinic.Id).Select(c => c.LastTicketNumber).SingleAsync(ct);
 
         var visit = new Visit
         {
             ClinicId = clinic.Id,
-            TicketCode = FormatTicket(clinic.LastTicketNumber),
+            TicketCode = FormatTicket(number),
             Initials = initials.ToUpperInvariant(),
             Reason = reason,
             CheckedInAt = now,
         };
         db.Visits.Add(visit);
-
-        if (!await TrySaveAsync(db, ct))
-        {
-            return Conflict("Another check-in happened at the same moment. Please try again.");
-        }
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         await notifier.ClinicChangedAsync(slug, ct);
         return Results.Created($"/api/clinics/{slug}/visits/{visit.Id}", VisitDto.From(visit));
